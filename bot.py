@@ -49,7 +49,7 @@ from telegram.ext import (
 )
 
 # ================= CONFIG =================
-BOT_TOKEN = "YOUR_BOT_TOKEN"
+BOT_TOKEN = "8651711814:AAFYaEHDFy8hEjzzEVfhkJo-F_kzceoyOS4"
 
 RAZORPAY_KEY = "YOUR_KEY"
 RAZORPAY_SECRET = "YOUR_SECRET"
