@@ -10,7 +10,7 @@ from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 
 # ===== CONFIG =====
-BOT_TOKEN = "8345172518:AAHahPKnJZwKZ-SIp97vBtNyMyyRXZ-Gw7M"
+BOT_TOKEN = "8651711814:AAFYaEHDFy8hEjzzEVfhkJo-F_kzceoyOS4"
 ADMIN_ID = 8451049817
 LIKE_API_KEY = "7d01eb30166546130c171b26eecee191"
 LIKE_API_URL = "https://tntsmm.in/api/v2"
