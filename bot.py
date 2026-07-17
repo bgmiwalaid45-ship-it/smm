@@ -369,7 +369,7 @@ async def cmd_profit(update: Update, context: ContextTypes.DEFAULT_TYPE):
     orders = cur.fetchall()
     conn.close()
 
-    COST = {"likes_eco": 40, "likes_prem": 55, "comments": 80}  # ₹ per 1000 approx
+    COST = {"likes_eco": 50, "likes_prem": 70, "comments": 140}  # ₹ per 1000 approx
     SELL = {"likes_eco": PRICE_LIKE_ECO, "likes_prem": PRICE_LIKE_PREM, "comments": PRICE_COMMENT}
     rev = cost = 0
     for svc, qty in orders:
