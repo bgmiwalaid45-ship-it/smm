@@ -31,16 +31,17 @@ logging.basicConfig(
 log = logging.getLogger("smm_bot")
 
 # ================= CONFIG =================
-# NEVER hardcode secrets in source. Set these as real environment variables
-# (or load from a .env file with python-dotenv) before running the bot.
+# Hardcoded directly in source per request. Keep this repo PRIVATE — anyone
+# with access to this file has full control of the bot, the Razorpay
+# account, and the SMM panel key.
 BOT_TOKEN = "8651711814:AAFYaEHDFy8hEjzzEVfhkJo-F_kzceoyOS4"
-RAZORPAY_KEY = ""
-RAZORPAY_SECRET = ""
-WEBHOOK_SECRET = ""
+RAZORPAY_KEY = "YOUR_RAZORPAY_KEY_ID"
+RAZORPAY_SECRET = "YOUR_RAZORPAY_KEY_SECRET"
+WEBHOOK_SECRET = "YOUR_RAZORPAY_WEBHOOK_SECRET"
 
 COMMENT_API_URL = "https://smm-jupiter.com/api/v2"
-COMMENT_API_KEY = ""
-COMMENT_SERVICE_ID = "13259")
+COMMENT_API_KEY = "YOUR_SMM_PANEL_API_KEY"
+COMMENT_SERVICE_ID = "13259"
 
 client = razorpay.Client(auth=(RAZORPAY_KEY, RAZORPAY_SECRET))
 
@@ -385,9 +386,12 @@ def webhook():
 
 # ================= RUN =================
 def run_flask():
+    # Railway (and most PaaS providers) inject the port to bind via the PORT
+    # env var — it's assigned dynamically, so don't hardcode it.
+    port = int(os.environ.get("PORT", 5000))
     # debug=False and use_reloader=False are important: the reloader spawns a
     # second process which would double-init everything.
-    app_web.run(host="0.0.0.0", port=5000, debug=False, use_reloader=False)
+    app_web.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
 
 
 def run_bot():
