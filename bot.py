@@ -20,7 +20,7 @@ BOT_TOKEN      = "8651711814:AAFYaEHDFy8hEjzzEVfhkJo-F_kzceoyOS4"
 ADMIN_ID       = 8451049817
 
 # ── Likes API (smmhype.com) ──
-SMMHYPE_KEY    = "YOUR_SMMHYPE_API_KEY"   # ← apna smmhype.com API key daalo
+SMMHYPE_KEY    = "e4beb3a1da92e8a97996957d4e76c139"   # ← apna smmhype.com API key daalo
 SMMHYPE_URL    = "https://smmhype.com/api/v2"
 SVC_LIKE_ECO   = "498"    # Economy Likes  ₹99/1000   +2K/Day  Refill 30D
 SVC_LIKE_PREM  = "19564"  # Premium Likes  ₹120/1000  No Drop  Refill 30D
@@ -29,7 +29,7 @@ PRICE_LIKE_ECO  = 99    # ₹ per 1000
 PRICE_LIKE_PREM = 120   # ₹ per 1000
 
 # ── Comments API (tntsmm.in) ──
-TNTSMM_KEY     = "7d01eb30166546130c171b26eecee191"
+TNTSMM_KEY     = "ae8d2e40696b83288e80fd949b96128e"
 TNTSMM_URL     = "https://tntsmm.in/api/v2"
 SVC_COMMENT    = "12634"  # YT Custom Comment  ₹200/1000  2K+/Day  Instant
 
