@@ -33,10 +33,10 @@ log = logging.getLogger("smm_bot")
 # ================= CONFIG =================
 # NEVER hardcode secrets in source. Set these as real environment variables
 # (or load from a .env file with python-dotenv) before running the bot.
-BOT_TOKEN = os.environ["8651711814:AAFYaEHDFy8hEjzzEVfhkJo-F_kzceoyOS4"]
-RAZORPAY_KEY = os.environ["RAZORPAY_KEY"]
-RAZORPAY_SECRET = os.environ["RAZORPAY_SECRET"]
-WEBHOOK_SECRET = os.environ["WEBHOOK_SECRET"]
+BOT_TOKEN = 8651711814:AAFYaEHDFy8hEjzzEVfhkJo-F_kzceoyOS4
+RAZORPAY_KEY = 
+RAZORPAY_SECRET = 
+WEBHOOK_SECRET = 
 
 COMMENT_API_URL = os.environ.get("COMMENT_API_URL", "https://smm-jupiter.com/api/v2")
 COMMENT_API_KEY = os.environ["COMMENT_API_KEY"]
