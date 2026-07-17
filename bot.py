@@ -5,6 +5,7 @@ import hmac
 import hashlib
 import os
 import asyncio
+import threading
 from flask import Flask, request
 from telegram import Update, ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import (
@@ -270,6 +271,35 @@ user_steps = {}
 
 telegram_app = ApplicationBuilder().token(BOT_TOKEN).build()
 
+# ── Non-blocking Telegram notify (runs in background thread, never blocks event loop) ──
+def _tg_send(chat_id, text):
+    try:
+        requests.post(
+            f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
+            json={"chat_id": chat_id, "text": text, "parse_mode": "HTML"},
+            timeout=10
+        )
+    except Exception:
+        pass
+
+def notify(chat_id, text):
+    """Fire-and-forget: send a Telegram message without blocking the bot."""
+    threading.Thread(target=_tg_send, args=(chat_id, text), daemon=True).start()
+
+# ── Non-blocking SMM API call ──
+def smm_order_async(api_url, payload, on_success, on_fail):
+    """Place SMM order in a background thread, call callback with result."""
+    def _run():
+        try:
+            res = requests.post(api_url, data=payload, timeout=20).json()
+        except Exception as e:
+            res = {"error": str(e)}
+        asyncio.run_coroutine_threadsafe(
+            on_success(res) if "order" in res else on_fail(res),
+            _bg_loop
+        )
+    threading.Thread(target=_run, daemon=True).start()
+
 # ── /start ──
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     tg   = update.message.chat_id
@@ -300,8 +330,7 @@ async def cmd_addbalance(update: Update, context: ContextTypes.DEFAULT_TYPE):
         amt = float(context.args[1])
         update_balance(tg, amt)
         await update.message.reply_text(f"✅ Added <b>₹{amt}</b> to <code>{tg}</code>", parse_mode="HTML")
-        requests.get(f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
-                     params={"chat_id": tg, "text": f"🎉 Admin has added ₹{amt} to your account!\n💰 New Balance: ₹{get_balance(tg)}", "parse_mode": "HTML"})
+        notify(tg, f"🎉 Admin has added ₹{amt} to your account!\n💰 New Balance: ₹{get_balance(tg)}")
     except:
         await update.message.reply_text("Usage: /addbalance USER_ID AMOUNT")
 
@@ -369,15 +398,22 @@ async def cmd_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     conn = db(); cur = conn.cursor()
     cur.execute("SELECT telegram_id FROM users")
     users = cur.fetchall(); conn.close()
-    sent = fail = 0
-    for (uid,) in users:
-        try:
-            requests.get(f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
-                         params={"chat_id": uid, "text": f"📢 <b>Announcement</b>\n\n{msg}", "parse_mode": "HTML"})
-            sent += 1
-        except:
-            fail += 1
-    await update.message.reply_text(f"✅ Broadcast done!\n📨 Sent: {sent}  ❌ Failed: {fail}")
+    total = len(users)
+    await update.message.reply_text(f"📤 Broadcasting to {total} users...")
+
+    def _do_broadcast():
+        sent = fail = 0
+        for (uid,) in users:
+            try:
+                _tg_send(uid, f"📢 <b>Announcement</b>\n\n{msg}")
+                sent += 1
+            except:
+                fail += 1
+        async def _done():
+            await update.message.reply_text(f"✅ Broadcast done!\n📨 Sent: {sent}  ❌ Failed: {fail}")
+        asyncio.run_coroutine_threadsafe(_done(), _bg_loop)
+
+    threading.Thread(target=_do_broadcast, daemon=True).start()
 
 # ══════════════════════════════════════════
 #           💬  MAIN MESSAGE HANDLER
@@ -530,21 +566,31 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not text.startswith("http"):
             return await update.message.reply_text("❌ Please send a valid URL starting with http:// or https://")
         context.user_data["link"] = text
-        user_steps[tg] = "svc_qty"
         svc_type = context.user_data.get("svc_type", "")
+
+        # Comments → skip quantity, go straight to comment text
         if svc_type == "comments":
+            user_steps[tg] = "svc_comments_text"
             return await update.message.reply_text(
-                "🔢 <b>Enter quantity</b> (how many comments):\n"
-                "<i>Minimum: 10  |  Maximum: 10,000</i>",
+                "✍️ <b>Comments bhejo</b>\n\n"
+                "Har comment <b>naye line</b> pe likho:\n\n"
+                "<code>Great video!\n"
+                "Loved it 🔥\n"
+                "Amazing content!\n"
+                "Keep it up bro!</code>\n\n"
+                "📌 Jitne comments bhejoge, utne hi order honge.\n"
+                "<i>Price automatically calculate hoga.</i>",
                 parse_mode="HTML"
             )
+
+        user_steps[tg] = "svc_qty"
         return await update.message.reply_text(
             "🔢 <b>Enter quantity</b>:\n"
             "<i>Minimum: 100  |  Maximum: 100,000</i>",
             parse_mode="HTML"
         )
 
-    # Step 2: quantity received
+    # Step 2: quantity received (only for likes)
     if step == "svc_qty":
         if not text.isdigit() or int(text) <= 0:
             return await update.message.reply_text("❌ Invalid quantity. Enter a positive number.")
@@ -553,19 +599,8 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["qty"]   = qty
         context.user_data["price"] = price
 
-        svc_type = context.user_data.get("svc_type", "")
-        if svc_type == "comments":
-            user_steps[tg] = "svc_comments_text"
-            return await update.message.reply_text(
-                f"✍️ <b>Enter comment text</b>\n\n"
-                "For multiple comments, put each on a <b>new line</b>:\n"
-                "<code>Great video!\nLoved it 🔥\nAmazing content!</code>\n\n"
-                "They will be cycled to fill your quantity.",
-                parse_mode="HTML"
-            )
-        else:
-            user_steps[tg] = "svc_confirm"
-            return await update.message.reply_text(
+        user_steps[tg] = "svc_confirm"
+        return await update.message.reply_text(
                 msg_order_summary(
                     context.user_data["svc_name"], qty, price, context.user_data["link"]
                 ),
@@ -576,16 +611,38 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if step == "svc_comments_text":
         comment_text = text.strip()
         if not comment_text:
-            return await update.message.reply_text("❌ Comment text cannot be empty.")
+            return await update.message.reply_text("❌ Koi comment nahi mila. Dobara bhejo.")
+
+        # Count valid lines = quantity (auto-calculate)
+        lines = [l.strip() for l in comment_text.split("\n") if l.strip()]
+        qty   = len(lines)
+        if qty < 1:
+            return await update.message.reply_text("❌ Kam se kam 1 comment hona chahiye.")
+
+        price = round((qty / 1000) * context.user_data["svc_price"], 2)
+
         context.user_data["comment_text"] = comment_text
+        context.user_data["qty"]          = qty
+        context.user_data["price"]        = price
         user_steps[tg] = "svc_confirm"
-        qty   = context.user_data["qty"]
-        price = context.user_data["price"]
-        preview = comment_text[:60] + ("…" if len(comment_text) > 60 else "")
+
+        # Show all comments as preview (max 5 lines shown)
+        preview_lines = lines[:5]
+        preview = "\n".join(f"  • {l}" for l in preview_lines)
+        if len(lines) > 5:
+            preview += f"\n  <i>...aur {len(lines)-5} comments</i>"
+
         return await update.message.reply_text(
-            msg_order_summary(
-                context.user_data["svc_name"], qty, price, context.user_data["link"]
-            ) + f"\n📝 <b>Comment:</b>\n<i>{preview}</i>",
+            "╔════════════════════╗\n"
+            "║  📋 <b>ORDER SUMMARY</b>  ║\n"
+            "╚════════════════════╝\n\n"
+            f"📌 <b>Service:</b>  {context.user_data['svc_name']}\n"
+            f"💬 <b>Comments:</b> {qty} (auto-counted)\n"
+            f"💰 <b>Price:</b>    ₹{price}\n"
+            f"🔗 <b>Link:</b>\n<code>{context.user_data['link']}</code>\n\n"
+            f"📝 <b>Your Comments:</b>\n{preview}\n\n"
+            "─────────────────────\n"
+            "Tap <b>✅ Confirm Order</b> to proceed.",
             parse_mode="HTML", reply_markup=kb_confirm()
         )
 
@@ -632,38 +689,48 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 repeated.extend(raw_lines)
             payload["comments"] = "\n".join(repeated[:qty])
 
-        res = requests.post(api_url, data=payload).json()
+        # Tell user we're processing immediately (feels faster)
+        await update.message.reply_text(
+            "⏳ <b>Placing your order...</b>",
+            parse_mode="HTML"
+        )
+        user_steps.pop(tg, None); context.user_data.clear()
 
-        if "order" in res:
-            update_balance(tg, -price)
-            save_order(res["order"], tg, svc_type, link, qty)
-            # Notify admin
-            requests.get(
-                f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
-                params={
-                    "chat_id": ADMIN_ID,
-                    "text": (
+        # Place SMM order in background thread — doesn't block event loop
+        _tg   = tg
+        _msg  = update.message
+
+        def _place_order():
+            try:
+                res = requests.post(api_url, data=payload, timeout=20).json()
+            except Exception as e:
+                res = {"error": str(e)}
+
+            async def _reply():
+                if "order" in res:
+                    update_balance(_tg, -price)
+                    save_order(res["order"], _tg, svc_type, link, qty)
+                    notify(ADMIN_ID,
                         f"🆕 New Order!\n"
-                        f"👤 User: {tg}\n"
+                        f"👤 User: {_tg}\n"
                         f"📌 Service: {svc_name}\n"
                         f"🔢 Qty: {qty:,}\n"
                         f"💰 Charged: ₹{price}\n"
                         f"🆔 Order ID: {res['order']}"
                     )
-                }
-            )
-            await update.message.reply_text(
-                msg_order_placed(res["order"], svc_name, qty),
-                parse_mode="HTML", reply_markup=kb_main()
-            )
-        else:
-            err = res.get("error", "Unknown error")
-            await update.message.reply_text(
-                f"❌ <b>Order Failed</b>\n\n<i>{err}</i>\n\nPlease try again or contact support.",
-                parse_mode="HTML", reply_markup=kb_main()
-            )
+                    await _msg.reply_text(
+                        msg_order_placed(res["order"], svc_name, qty),
+                        parse_mode="HTML", reply_markup=kb_main()
+                    )
+                else:
+                    err = res.get("error", "Unknown error")
+                    await _msg.reply_text(
+                        f"❌ <b>Order Failed</b>\n\n<i>{err}</i>\n\nPlease try again or contact support.",
+                        parse_mode="HTML", reply_markup=kb_main()
+                    )
+            asyncio.run_coroutine_threadsafe(_reply(), _bg_loop)
 
-        user_steps.pop(tg, None); context.user_data.clear()
+        threading.Thread(target=_place_order, daemon=True).start()
 
 # ══════════════════════════════════════════
 #           📋  REGISTER HANDLERS
@@ -678,6 +745,18 @@ telegram_app.add_handler(CommandHandler("broadcast",    cmd_broadcast))
 telegram_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle))
 
 # ══════════════════════════════════════════
+#    ⚡  PERSISTENT BACKGROUND EVENT LOOP
+#    (one loop reused for ALL updates)
+# ══════════════════════════════════════════
+_bg_loop = asyncio.new_event_loop()
+
+def _start_bg_loop(loop):
+    asyncio.set_event_loop(loop)
+    loop.run_forever()
+
+threading.Thread(target=_start_bg_loop, args=(_bg_loop,), daemon=True).start()
+
+# ══════════════════════════════════════════
 #              🌐  FLASK SERVER
 # ══════════════════════════════════════════
 app = Flask(__name__)
@@ -686,10 +765,8 @@ app = Flask(__name__)
 def telegram_webhook():
     data   = request.get_json(force=True)
     update = Update.de_json(data, telegram_app.bot)
-    loop   = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    loop.run_until_complete(telegram_app.process_update(update))
-    loop.close()
+    # Submit to background loop — return 200 OK instantly, no waiting
+    asyncio.run_coroutine_threadsafe(telegram_app.process_update(update), _bg_loop)
     return "ok"
 
 @app.route("/webhook", methods=["POST"])
@@ -739,24 +816,25 @@ def health():
 #                🚀  STARTUP
 # ══════════════════════════════════════════
 if __name__ == "__main__":
-    # Initialize telegram app once at startup
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    loop.run_until_complete(telegram_app.initialize())
+    # Initialize telegram app in the SAME background loop that handles all updates
+    fut = asyncio.run_coroutine_threadsafe(telegram_app.initialize(), _bg_loop)
+    fut.result(timeout=30)   # wait only at startup, not per-request
 
-    # Set webhook
+    # Register webhook with Telegram
     full_webhook_url = APP_URL + WEBHOOK_PATH
-    requests.get(f"https://api.telegram.org/bot{BOT_TOKEN}/deleteWebhook")
+    requests.get(f"https://api.telegram.org/bot{BOT_TOKEN}/deleteWebhook", timeout=10)
     result = requests.get(
         f"https://api.telegram.org/bot{BOT_TOKEN}/setWebhook",
-        params={"url": full_webhook_url}
+        params={"url": full_webhook_url},
+        timeout=10
     ).json()
 
     print("═" * 45)
-    print(f"  🚀 YT SMM Bot Started")
-    print(f"  📡 Webhook: {full_webhook_url}")
+    print(f"  🚀 YT SMM Bot Started  [FAST MODE]")
+    print(f"  📡 Webhook : {full_webhook_url}")
     print(f"  ✅ Telegram: {result.get('description', result)}")
     print("═" * 45)
 
     port = int(os.environ.get("PORT", 8080))
-    app.run(host="0.0.0.0", port=port)
+    # threaded=True — handle multiple webhook calls simultaneously
+    app.run(host="0.0.0.0", port=port, threaded=True)
