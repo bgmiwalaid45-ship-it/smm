@@ -21,7 +21,7 @@ COMMENT_SERVICE_ID = "13259"
 RAZORPAY_KEY = "rzp_live_Sc7lXEOJ2ZWjPL"
 RAZORPAY_SECRET = "KxRu3ssMBcNLTQ7LxMY0jZIQ"
 WEBHOOK_SECRET = "ayush@123"
-APP_URL = "https://smm-production-3fc3.up.railway.app"
+APP_URL = "https://smm-production-e703.up.railway.app"
 
 client = razorpay.Client(auth=(RAZORPAY_KEY, RAZORPAY_SECRET))
 
