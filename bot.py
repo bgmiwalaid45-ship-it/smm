@@ -24,7 +24,7 @@ from telegram.ext import (
 # CONFIG
 # ==============================
 
-BOT_TOKEN = "YOUR_BOT_TOKEN"
+BOT_TOKEN = "8651711814:AAFYaEHDFy8hEjzzEVfhkJo-F_kzceoyOS4"
 
 # Razorpay
 RAZORPAY_KEY = "YOUR_RAZORPAY_KEY"
