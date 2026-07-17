@@ -38,9 +38,9 @@ RAZORPAY_KEY = ""
 RAZORPAY_SECRET = ""
 WEBHOOK_SECRET = ""
 
-COMMENT_API_URL = os.environ.get("COMMENT_API_URL", "https://smm-jupiter.com/api/v2")
-COMMENT_API_KEY = os.environ["COMMENT_API_KEY"]
-COMMENT_SERVICE_ID = os.environ.get("COMMENT_SERVICE_ID", "13259")
+COMMENT_API_URL = "https://smm-jupiter.com/api/v2"
+COMMENT_API_KEY = ""
+COMMENT_SERVICE_ID = "13259")
 
 client = razorpay.Client(auth=(RAZORPAY_KEY, RAZORPAY_SECRET))
 
