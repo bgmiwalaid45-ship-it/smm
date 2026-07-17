@@ -586,7 +586,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_steps[tg] = "svc_qty"
         return await update.message.reply_text(
             "🔢 <b>Enter quantity</b>:\n"
-            "<i>Minimum: 100  |  Maximum: 100,000</i>",
+            "<i>Minimum: 20  |  Maximum: 100,000</i>",
             parse_mode="HTML"
         )
 
