@@ -416,6 +416,251 @@ async def cmd_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     threading.Thread(target=_do_broadcast, daemon=True).start()
 
 # ══════════════════════════════════════════
+#        🔑  EXTRA ADMIN COMMANDS
+# ══════════════════════════════════════════
+
+# Global maintenance flag
+MAINTENANCE_MODE = False
+
+async def cmd_removebalance(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message.chat_id != ADMIN_ID: return
+    try:
+        tg  = int(context.args[0])
+        amt = float(context.args[1])
+        if amt <= 0:
+            return await update.message.reply_text("❌ Amount must be positive.")
+        cur_bal = get_balance(tg)
+        deduct  = min(amt, cur_bal)
+        update_balance(tg, -deduct)
+        new_bal = get_balance(tg)
+        await update.message.reply_text(
+            f"✅ Removed <b>₹{deduct}</b> from <code>{tg}</code>\n"
+            f"💰 New Balance: <b>₹{new_bal}</b>",
+            parse_mode="HTML"
+        )
+        notify(tg, f"⚠️ Admin has deducted ₹{deduct} from your account.\n💰 Remaining Balance: ₹{new_bal}")
+    except (IndexError, ValueError):
+        await update.message.reply_text("Usage: /removebalance USER_ID AMOUNT")
+
+async def cmd_setbalance(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message.chat_id != ADMIN_ID: return
+    try:
+        tg      = int(context.args[0])
+        new_amt = float(context.args[1])
+        if new_amt < 0:
+            return await update.message.reply_text("❌ Amount cannot be negative.")
+        cur_bal = get_balance(tg)
+        update_balance(tg, new_amt - cur_bal)
+        await update.message.reply_text(
+            f"✅ Balance set to <b>₹{new_amt}</b> for <code>{tg}</code>\n"
+            f"📊 Previous: ₹{cur_bal}  →  New: ₹{new_amt}",
+            parse_mode="HTML"
+        )
+        notify(tg, f"🔧 Admin updated your balance.\n💰 New Balance: ₹{new_amt}")
+    except (IndexError, ValueError):
+        await update.message.reply_text("Usage: /setbalance USER_ID AMOUNT")
+
+async def cmd_userinfo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message.chat_id != ADMIN_ID: return
+    try:
+        tg   = int(context.args[0])
+        conn = db(); cur = conn.cursor()
+        cur.execute("SELECT balance, banned FROM users WHERE telegram_id=?", (tg,))
+        row = cur.fetchone()
+        if not row:
+            conn.close()
+            return await update.message.reply_text(f"❌ User <code>{tg}</code> not found.", parse_mode="HTML")
+        bal, banned = row
+        cur.execute("SELECT COUNT(*), SUM(quantity) FROM orders WHERE telegram_id=?", (tg,))
+        ord_count, ord_qty = cur.fetchone()
+        cur.execute("SELECT SUM(amount) FROM payments WHERE telegram_id=?", (tg,))
+        total_paid = cur.fetchone()[0] or 0
+        conn.close()
+        status = "🚫 BANNED" if banned else "✅ Active"
+        await update.message.reply_text(
+            "╔═══════════════════════╗\n"
+            "║   👤 <b>USER PROFILE</b>      ║\n"
+            "╚═══════════════════════╝\n\n"
+            f"🆔 <b>Telegram ID:</b> <code>{tg}</code>\n"
+            f"💰 <b>Balance:</b>     ₹{round(bal, 2)}\n"
+            f"🔖 <b>Status:</b>      {status}\n\n"
+            f"📦 <b>Total Orders:</b>  {ord_count or 0}\n"
+            f"🔢 <b>Total Qty:</b>    {(ord_qty or 0):,}\n"
+            f"💳 <b>Total Paid:</b>   ₹{round(total_paid, 2)}",
+            parse_mode="HTML"
+        )
+    except (IndexError, ValueError):
+        await update.message.reply_text("Usage: /userinfo USER_ID")
+
+async def cmd_userorders(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message.chat_id != ADMIN_ID: return
+    try:
+        tg   = int(context.args[0])
+        conn = db(); cur = conn.cursor()
+        cur.execute("""SELECT order_id, service, quantity, created_at
+                       FROM orders WHERE telegram_id=?
+                       ORDER BY rowid DESC LIMIT 10""", (tg,))
+        rows = cur.fetchall(); conn.close()
+        if not rows:
+            return await update.message.reply_text(f"📦 No orders for <code>{tg}</code>.", parse_mode="HTML")
+        lines = [f"📦 <b>Orders for <code>{tg}</code></b>\n"]
+        for i, (oid, svc, qty, ts) in enumerate(rows, 1):
+            sname = SERVICE_NAMES.get(svc, svc)
+            date  = str(ts)[:10] if ts else "—"
+            lines.append(f"<b>#{i}</b> {sname} | {qty:,} | {date}\n    🆔 <code>{oid}</code>")
+        await update.message.reply_text("\n".join(lines), parse_mode="HTML")
+    except (IndexError, ValueError):
+        await update.message.reply_text("Usage: /userorders USER_ID")
+
+async def cmd_allorders(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message.chat_id != ADMIN_ID: return
+    try:
+        limit = int(context.args[0]) if context.args else 10
+        limit = min(limit, 25)
+    except ValueError:
+        limit = 10
+    conn = db(); cur = conn.cursor()
+    cur.execute("""SELECT order_id, telegram_id, service, quantity, created_at
+                   FROM orders ORDER BY rowid DESC LIMIT ?""", (limit,))
+    rows = cur.fetchall(); conn.close()
+    if not rows:
+        return await update.message.reply_text("📦 No orders yet.")
+    lines = [f"📋 <b>Last {limit} Orders</b>\n"]
+    for i, (oid, uid, svc, qty, ts) in enumerate(rows, 1):
+        sname = SERVICE_NAMES.get(svc, svc)
+        date  = str(ts)[:10] if ts else "—"
+        lines.append(f"<b>#{i}</b> <code>{uid}</code> | {sname} | {qty:,} | {date}\n    🆔 <code>{oid}</code>")
+    await update.message.reply_text("\n".join(lines), parse_mode="HTML")
+
+async def cmd_topusers(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message.chat_id != ADMIN_ID: return
+    conn = db(); cur = conn.cursor()
+    cur.execute("SELECT telegram_id, balance FROM users ORDER BY balance DESC LIMIT 10")
+    rows = cur.fetchall(); conn.close()
+    if not rows:
+        return await update.message.reply_text("No users found.")
+    medals = ["🥇","🥈","🥉"] + ["🔹"]*7
+    lines = ["🏆 <b>TOP 10 USERS (by Balance)</b>\n"]
+    for i, (uid, bal) in enumerate(rows):
+        lines.append(f"{medals[i]} <code>{uid}</code>  —  ₹{round(bal,2)}")
+    await update.message.reply_text("\n".join(lines), parse_mode="HTML")
+
+async def cmd_refund(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message.chat_id != ADMIN_ID: return
+    try:
+        tg     = int(context.args[0])
+        amt    = float(context.args[1])
+        reason = " ".join(context.args[2:]) if len(context.args) > 2 else "Admin refund"
+        if amt <= 0:
+            return await update.message.reply_text("❌ Amount must be positive.")
+        update_balance(tg, amt)
+        new_bal = get_balance(tg)
+        await update.message.reply_text(
+            f"💸 Refunded <b>₹{amt}</b> to <code>{tg}</code>\n"
+            f"📝 Reason: {reason}\n"
+            f"💰 New Balance: <b>₹{new_bal}</b>",
+            parse_mode="HTML"
+        )
+        notify(tg,
+            f"💸 <b>Refund Received!</b>\n\n"
+            f"💰 Amount: ₹{amt}\n"
+            f"📝 Reason: {reason}\n"
+            f"🏦 New Balance: ₹{new_bal}"
+        )
+    except (IndexError, ValueError):
+        await update.message.reply_text("Usage: /refund USER_ID AMOUNT [reason]")
+
+async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message.chat_id != ADMIN_ID: return
+    import datetime
+    today = datetime.date.today().isoformat()
+    conn  = db(); cur = conn.cursor()
+    cur.execute("SELECT COUNT(*) FROM users")
+    total_users = cur.fetchone()[0]
+    cur.execute("SELECT COUNT(*) FROM users WHERE banned=1")
+    banned_count = cur.fetchone()[0]
+    cur.execute("SELECT COUNT(*) FROM orders WHERE created_at LIKE ?", (f"{today}%",))
+    orders_today = cur.fetchone()[0]
+    cur.execute("SELECT COUNT(*) FROM orders")
+    orders_total = cur.fetchone()[0]
+    cur.execute("SELECT SUM(amount) FROM payments")
+    total_rev = cur.fetchone()[0] or 0
+    cur.execute("SELECT SUM(balance) FROM users")
+    wallet_total = cur.fetchone()[0] or 0
+    conn.close()
+    maint = "🔴 ON" if MAINTENANCE_MODE else "🟢 OFF"
+    await update.message.reply_text(
+        "╔════════════════════════╗\n"
+        "║  📊 <b>BOT STATISTICS</b>      ║\n"
+        "╚════════════════════════╝\n\n"
+        f"👤 <b>Total Users:</b>       {total_users}\n"
+        f"🚫 <b>Banned Users:</b>      {banned_count}\n\n"
+        f"📦 <b>Orders Today:</b>      {orders_today}\n"
+        f"📦 <b>Orders Total:</b>      {orders_total}\n\n"
+        f"💳 <b>Total Revenue:</b>     ₹{round(total_rev,2)}\n"
+        f"💰 <b>Wallets Balance:</b>   ₹{round(wallet_total,2)}\n\n"
+        f"🔧 <b>Maintenance:</b>       {maint}",
+        parse_mode="HTML"
+    )
+
+async def cmd_allbans(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message.chat_id != ADMIN_ID: return
+    conn = db(); cur = conn.cursor()
+    cur.execute("SELECT telegram_id FROM users WHERE banned=1")
+    rows = cur.fetchall(); conn.close()
+    if not rows:
+        return await update.message.reply_text("✅ No banned users.")
+    lines = [f"🚫 <b>Banned Users ({len(rows)})</b>\n"]
+    for (uid,) in rows:
+        lines.append(f"  • <code>{uid}</code>")
+    await update.message.reply_text("\n".join(lines), parse_mode="HTML")
+
+async def cmd_maintenance(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    global MAINTENANCE_MODE
+    if update.message.chat_id != ADMIN_ID: return
+    if context.args:
+        arg = context.args[0].lower()
+        MAINTENANCE_MODE = arg in ("on", "1", "true", "yes")
+    else:
+        MAINTENANCE_MODE = not MAINTENANCE_MODE
+    state = "🔴 ON — All users now see a maintenance notice." \
+            if MAINTENANCE_MODE else \
+            "🟢 OFF — Bot is back online for all users."
+    await update.message.reply_text(f"🔧 <b>Maintenance Mode:</b> {state}", parse_mode="HTML")
+
+async def cmd_adminhelp(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message.chat_id != ADMIN_ID: return
+    await update.message.reply_text(
+        "╔═══════════════════════════╗\n"
+        "║   🔑 <b>ADMIN COMMAND LIST</b>   ║\n"
+        "╚═══════════════════════════╝\n\n"
+        "<b>👤 User Management</b>\n"
+        "/balance <code>UID</code> — Check balance\n"
+        "/addbalance <code>UID AMT</code> — Add balance\n"
+        "/removebalance <code>UID AMT</code> — Deduct balance\n"
+        "/setbalance <code>UID AMT</code> — Set exact balance\n"
+        "/refund <code>UID AMT [reason]</code> — Credit refund\n"
+        "/userinfo <code>UID</code> — Full user profile\n"
+        "/ban <code>UID</code> — Ban user\n"
+        "/unban <code>UID</code> — Unban user\n"
+        "/allbans — List all banned users\n\n"
+        "<b>📦 Orders</b>\n"
+        "/userorders <code>UID</code> — User\xe2�s last 10 orders\n"
+        "/allorders <code>[count]</code> — Recent orders (all users)\n\n"
+        "<b>📊 Analytics</b>\n"
+        "/profit — Revenue & profit breakdown\n"
+        "/stats — Today\xe2�s stats & overview\n"
+        "/topusers — Top 10 users by balance\n\n"
+        "<b>📡 System</b>\n"
+        "/broadcast <code>msg</code> — Message all users\n"
+        "/maintenance <code>[on|off]</code> — Toggle maintenance\n"
+        "/adminhelp — This menu",
+        parse_mode="HTML"
+    )
+
+
+
+# ══════════════════════════════════════════
 #           💬  MAIN MESSAGE HANDLER
 # ══════════════════════════════════════════
 async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -424,7 +669,15 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     step = user_steps.get(tg)
 
     # Ban check
-    if is_banned(tg):
+    # Maintenance mode check (admin exempt)
+    if MAINTENANCE_MODE and tg != ADMIN_ID:
+        return await update.message.reply_text(
+            "🔧 <b>Bot is under maintenance.</b>\n\nPlease check back in a few minutes!",
+            parse_mode="HTML"
+        )
+
+    # Ban check
+
         return await update.message.reply_text("🚫 Your account has been suspended.\nContact @ayushpatelh for support.")
 
     # ── Back ──
@@ -742,6 +995,18 @@ telegram_app.add_handler(CommandHandler("ban",          cmd_ban))
 telegram_app.add_handler(CommandHandler("unban",        cmd_unban))
 telegram_app.add_handler(CommandHandler("profit",       cmd_profit))
 telegram_app.add_handler(CommandHandler("broadcast",    cmd_broadcast))
+    telegram_app.add_handler(CommandHandler("removebalance", cmd_removebalance))
+    telegram_app.add_handler(CommandHandler("setbalance",    cmd_setbalance))
+    telegram_app.add_handler(CommandHandler("userinfo",      cmd_userinfo))
+    telegram_app.add_handler(CommandHandler("userorders",    cmd_userorders))
+    telegram_app.add_handler(CommandHandler("allorders",     cmd_allorders))
+    telegram_app.add_handler(CommandHandler("topusers",      cmd_topusers))
+    telegram_app.add_handler(CommandHandler("refund",        cmd_refund))
+    telegram_app.add_handler(CommandHandler("stats",         cmd_stats))
+    telegram_app.add_handler(CommandHandler("allbans",       cmd_allbans))
+    telegram_app.add_handler(CommandHandler("maintenance",   cmd_maintenance))
+    telegram_app.add_handler(CommandHandler("adminhelp",     cmd_adminhelp))
+
 telegram_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle))
 
 # ══════════════════════════════════════════
