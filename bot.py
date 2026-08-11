@@ -20,13 +20,13 @@ BOT_TOKEN      = "8651711814:AAFYaEHDFy8hEjzzEVfhkJo-F_kzceoyOS4"
 ADMIN_ID       = 8451049817
 
 # ── Likes API (smmhype.com) ──
-SMMHYPE_KEY    = "e4beb3a1da92e8a97996957d4e76c139"   # ← apna smmhype.com API key daalo
+SMMHYPE_KEY    = "661bfeb26cf06c0f4a9c131e27b1b220"   # ← apna smmhype.com API key daalo
 SMMHYPE_URL    = "https://smmhype.com/api/v2"
 SVC_LIKE_ECO   = "498"    # Economy Likes  ₹99/1000   +2K/Day  Refill 30D
 SVC_LIKE_PREM  = "19564"  # Premium Likes  ₹120/1000  No Drop  Refill 30D
 
-PRICE_LIKE_ECO  = 99    # ₹ per 1000
-PRICE_LIKE_PREM = 120   # ₹ per 1000
+PRICE_LIKE_ECO  = 150    # ₹ per 1000
+PRICE_LIKE_PREM = 200   # ₹ per 1000
 
 # ── Comments API (tntsmm.in) ──
 TNTSMM_KEY     = "ae8d2e40696b83288e80fd949b96128e"
@@ -177,9 +177,9 @@ def msg_services():
         "║   🛒 <b>OUR SERVICES</b>  ║\n"
         "╚═══════════════════╝\n\n"
         "▶️ <b>YouTube Likes</b>\n"
-        "  ├ ⚡ Economy  — ₹99/1000\n"
+        "  ├ ⚡ Economy  — ₹150/1000\n"
         "  │     +2K/Day | Refill 30 Days\n"
-        "  └ 👑 Premium  — ₹120/1000\n"
+        "  └ 👑 Premium  — ₹200/1000\n"
         "        No Drop | Refill 30 Days\n\n"
         "💬 <b>YouTube Comments</b>\n"
         "  └ ✍️ Custom  — ₹200/1000\n"
