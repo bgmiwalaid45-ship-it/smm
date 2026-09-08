@@ -17,7 +17,7 @@ from telegram.ext import (
 #               ⚙️  CONFIG
 # ══════════════════════════════════════════
 BOT_TOKEN      = "8651711814:AAFYaEHDFy8hEjzzEVfhkJo-F_kzceoyOS4"
-ADMIN_ID       = 8451049816
+ADMIN_ID       = 8451049817
 
 # ── Likes API (smmhype.com) ──
 SMMHYPE_KEY    = "84bb32b0c38bafde39a98b7a696f9c39"   # ← apna smmhype.com API key daalo
