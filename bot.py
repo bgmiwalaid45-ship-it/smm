@@ -25,15 +25,15 @@ SMMHYPE_URL    = "https://smmhype.com/api/v2"
 SVC_LIKE_ECO   = "498"    # Economy Likes  ₹99/1000   +2K/Day  Refill 30D
 SVC_LIKE_PREM  = "19564"  # Premium Likes  ₹120/1000  No Drop  Refill 30D
 
-PRICE_LIKE_ECO  = 150    # ₹ per 1000
-PRICE_LIKE_PREM = 200   # ₹ per 1000
+PRICE_LIKE_ECO  = 180    # ₹ per 1000
+PRICE_LIKE_PREM = 220   # ₹ per 1000
 
 # ── Comments API (tntsmm.in) ──
 TNTSMM_KEY     = "a971e689f7e6f6f1b8b0f1addde61440"
 TNTSMM_URL     = "https://tntsmm.in/api/v2"
-SVC_COMMENT    = "12634"  # YT Custom Comment  ₹200/1000  2K+/Day  Instant
+SVC_COMMENT    = "7406"  # YT Custom Comment  ₹200/1000  2K+/Day  Instant
 
-PRICE_COMMENT  = 200  # ₹ per 1000
+PRICE_COMMENT  = 450  # ₹ per 1000
 
 # ── Razorpay ──
 RAZORPAY_KEY    = "rzp_live_Sc7lXEOJ2ZWjPL"
@@ -177,12 +177,12 @@ def msg_services():
         "║   🛒 <b>OUR SERVICES</b>  ║\n"
         "╚═══════════════════╝\n\n"
         "▶️ <b>YouTube Likes</b>\n"
-        "  ├ ⚡ Economy  — ₹150/1000\n"
+        "  ├ ⚡ Economy  — ₹180/1000\n"
         "  │     +2K/Day | Refill 30 Days\n"
-        "  └ 👑 Premium  — ₹200/1000\n"
+        "  └ 👑 Premium  — ₹220/1000\n"
         "        No Drop | Refill 30 Days\n\n"
         "💬 <b>YouTube Comments</b>\n"
-        "  └ ✍️ Custom  — ₹200/1000\n"
+        "  └ ✍️ Custom  — ₹450/1000\n"
         "        Instant | 2K+/Day\n\n"
         "👇 Select a service:"
     )
