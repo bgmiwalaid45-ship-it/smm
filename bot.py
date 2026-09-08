@@ -46,7 +46,7 @@ if REPLIT_DOMAIN:
     APP_URL      = f"https://{REPLIT_DOMAIN}"
     WEBHOOK_PATH = f"/api/{BOT_TOKEN}"
 else:
-    APP_URL      = "https://smm-production-e703.up.railway.app"
+    APP_URL      = "https://smm-production-cf45.up.railway.app"
     WEBHOOK_PATH = f"/{BOT_TOKEN}"
 
 client = razorpay.Client(auth=(RAZORPAY_KEY, RAZORPAY_SECRET))
