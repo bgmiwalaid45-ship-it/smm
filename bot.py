@@ -16,7 +16,7 @@ from telegram.ext import (
 # ══════════════════════════════════════════
 #               ⚙️  CONFIG
 # ══════════════════════════════════════════
-BOT_TOKEN      = "8651711814:AAFYaEHDFy8hEjzzEVfhkJo-F_kzceoyOS4"
+BOT_TOKEN      = "8651711814:AAHz_T9o4mHhEjhKI7ySySP7OkQokkt9iBs"
 ADMIN_ID       = 8451049817
 
 # ── Likes API (smmhype.com) ──
